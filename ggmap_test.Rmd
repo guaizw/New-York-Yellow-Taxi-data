@@ -1,0 +1,39 @@
+---
+title: "GGmap"
+author: "Zi Wei"
+date: "7/7/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggmap)
+knitr::opts_chunk$set(echo = TRUE,message = F, warning = F)
+```
+
+```{r}
+register_google("AIzaSyAv8JFp9X1gNOLZUDLL78mWPqOoAnBX9e8")
+```
+
+
+```{r}
+ny_base_map <- get_map(location = c(lon = -74.00, lat = 40.71), maptype = "terrain", zoom = 11)
+ny_base_map_zoom <- ggmap(ny_base_map)+scale_x_continuous(limits = c(-74.1,-73.9))+
+  scale_y_continuous(limits = c(40.7,40.8))
+ny_base_map_zoom
+```
+
+```{r}
+pickup_point <- data.frame(longitude = c(-73.97561,-73.98698,
+                                           -73.97665	,-73.97958),
+                            latitude = c(40.79219,40.77662,
+                                         40.76509,40.75124),
+                           number = c(1,2,3,4))
+dropoff_point <- data.frame(longitude = c(-73.97639,-73.98772,
+                                          -73.96152,-73.97923),
+                            latitude = c(40.79090,40.77567,
+                                         40.77953,40.75103),
+                            number = c(1,2,3,4))
+ny_base_map_zoom + geom_point(data=pickup_point, aes(x=longitude, y=latitude), color="red", size=5, alpha=0.2)+ geom_point(data = dropoff_point,aes(x=longitude, y= latitude), color ="blue", size =5, alpha=0.2)+ geom_text(data = dropoff_point,aes(x=longitude, y= latitude,label=number))+geom_text(data = pickup_point,aes(x=longitude, y= latitude,label=number))
+```
+
