@@ -1,0 +1,435 @@
+---
+title: "New York Taxi Data Exploration"
+author: "Zi Wei"
+output: pdf_document
+---
+
+```{r setup, message=FALSE, warning=FALSE,include=FALSE}
+library(bigrquery)
+library(tidyverse)
+library(ggmap)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+References for code are from: https://rpubs.com/shivanandiyer/BigRQuery
+
+```{r}
+# Required fields for connection to database
+project_id <- "local-concord-245816"
+dataset_id <- "project1"
+bq_connection <- dbConnect(bigquery(),project=project_id,dataset=dataset_id)
+```
+
+# Information about Database
+
+Taxi trips are recorded by the New York Taxi and Limousine Commision (TLC). There are 3 main categories for taxi trips: Yellow Medallion Taxicabs (yellow), For Hire Vehicles (fhv), and Street Hail Livery (green).
+
+Yellow taxis provide transportation exclusively through street hails while fhv taxis provide transport exclusively through pre-arranged rides. Green taxis are a hybrid between yellow and fhv taxis in that they can accept hails in certain areas of New York City but can also handle pre arranged rides.
+
+For this report I will be doing exploratory data analysis on the 2016 data for yellow taxis. The sql code to get the dataset is shown below:
+
+```{r echo=TRUE}
+"SELECT *  
+FROM [bigquery-public-data:new_york.tlc_yellow_trips_2016]
+WHERE pickup_longitude is not NULL and pickup_latitude is not NULL
+and dropoff_latitude  is not Null and dropoff_longitude is not NULL
+and trip_distance >0"
+```
+
+I used all rows (no limit) since I wanted to capture as much information as possible for the initial data exploration. I have also decided to take out Null values for pickup and dropoff related columns and any trips that are less than 0. This is done so that I can get as much complete information as possible.  
+
+
+```{r}
+yellow_16_table <- tbl(bq_connection, "yellow_taxi_2016b")
+```
+
+```{r}
+yellow_16_details <- yellow_16_table%>%
+  select(pickup_longitude,pickup_latitude,dropoff_latitude,dropoff_longitude,fare_amount,tolls_amount,tip_amount, total_amount,trip_distance,pickup_datetime,dropoff_datetime)
+```
+
+# Initial Data Exploration
+
+## Total Amount
+
+```{r}
+yellow_16_details%>%summarise(Mean=mean(total_amount),
+                              Sd = sd(total_amount),
+                              Minimum =  min(total_amount),
+                              Maximum = max(total_amount),
+                              Number_of_Rows = n()
+                              )
+```
+
+The minimum for Total fare is negative, this should be a recording error. Hence we will need to remove these values. At the same time, there are extremely large values in the dataset, with the maximum being more than 10000 times the mean. Such values could cause a shift in the standard deviation, leading to a very high standard deviation of 49, compared to the 16 of the mean.
+
+## Fare Amount
+
+```{r}
+yellow_16_details%>%summarise(Mean=mean(fare_amount),
+                              Sd = sd(fare_amount),
+                              Minimum =  min(fare_amount),
+                              Maximum = max(fare_amount),
+                              Number_of_Rows = n()
+                              )
+```
+
+In fare amount, we see that there is a negative minimum which does not make sense and should be an error in recording. We can also see that we have a very big maximum for fare amount, 187441. This means that either the distance travelled was extremely far or that there was an error in the meter.
+
+## Tolls Amount
+
+```{r}
+yellow_16_details%>%summarise(Mean=mean(tolls_amount),
+                              Sd = sd(tolls_amount),
+                              Minimum =  min(tolls_amount),
+                              Maximum = max(tolls_amount),
+                              Number_of_Rows = n()
+                              )
+```
+
+From our data, there are negative values for the minimum toll amount paid which should be an error in recording.
+
+## Trip Distance
+
+```{r}
+yellow_16_details%>%summarise(Mean=mean(trip_distance),
+                              Sd = sd(trip_distance),
+                              Minimum =  min(trip_distance),
+                              Maximum = max(trip_distance),
+                              Number_of_Rows = n()
+                              )
+```
+
+The trip distance has a relatively low mean of 4.92 miles and a high standard deviation of 4036 miles. This is probably due to the presence of very large values for trip distance, as indicated by the maximum 19072629 miles which is more than 3 million times the mean. This high trip distance recorded may explain	the high maxmum fare amount we observed earlier, which is determined by the trip distance. 
+
+# Large Values: Fare Amount
+
+In this section, we will try and understand the makeup of the large values we have observed for Fare amount.
+
+```{r}
+yellow_16_details%>%
+  select(fare_amount,trip_distance,total_amount,tolls_amount)%>%
+  filter(fare_amount>10000)%>%
+  summarise(Mean_fare=mean(fare_amount),
+                              Sd_fare = sd(fare_amount),
+                              Minimum_fare =  min(fare_amount),
+                              Maximum_fare = max(fare_amount),
+            Mean_distance=mean(trip_distance),
+                              Sd_distance = sd(trip_distance),
+                              Minimum_distance =  min(trip_distance),
+                              Maximum_distance = max(trip_distance),
+            Mean_toll=mean(tolls_amount),
+                              Sd_toll = sd(tolls_amount),
+                              Minimum_toll =  min(tolls_amount),
+                              Maximum_toll = max(tolls_amount),
+            Mean_total=mean(total_amount),
+                              Sd_total = sd(total_amount),
+                              Minimum_total =  min(total_amount),
+                              Maximum_total = max(total_amount),
+                              Number_of_Rows = n())
+```
+
+```{r}
+yellow_16_details%>%
+  select(fare_amount,trip_distance,total_amount,tolls_amount)%>%
+  filter(fare_amount>1000)%>%
+  summarise(Mean_fare=mean(fare_amount),
+                              Sd_fare = sd(fare_amount),
+                              Minimum_fare =  min(fare_amount),
+                              Maximum_fare = max(fare_amount),
+            Mean_distance=mean(trip_distance),
+                              Sd_distance = sd(trip_distance),
+                              Minimum_distance =  min(trip_distance),
+                              Maximum_distance = max(trip_distance),
+            Mean_toll=mean(tolls_amount),
+                              Sd_toll = sd(tolls_amount),
+                              Minimum_toll =  min(tolls_amount),
+                              Maximum_toll = max(tolls_amount),
+            Mean_total=mean(total_amount),
+                              Sd_total = sd(total_amount),
+                              Minimum_total =  min(total_amount),
+                              Maximum_total = max(total_amount),
+                              Number_of_Rows = n())
+```
+
+```{r}
+yellow_16_details%>%
+  select(fare_amount,trip_distance,total_amount,tolls_amount)%>%
+  filter(fare_amount>100)%>%
+  summarise(Mean_fare=mean(fare_amount),
+                              Sd_fare = sd(fare_amount),
+                              Minimum_fare =  min(fare_amount),
+                              Maximum_fare = max(fare_amount),
+            Mean_distance=mean(trip_distance),
+                              Sd_distance = sd(trip_distance),
+                              Minimum_distance =  min(trip_distance),
+                              Maximum_distance = max(trip_distance),
+            Mean_toll=mean(tolls_amount),
+                              Sd_toll = sd(tolls_amount),
+                              Minimum_toll =  min(tolls_amount),
+                              Maximum_toll = max(tolls_amount),
+            Mean_total=mean(total_amount),
+                              Sd_total = sd(total_amount),
+                              Minimum_total =  min(total_amount),
+                              Maximum_total = max(total_amount),
+                              Number_of_Rows = n())
+```
+
+Above, we show the summary statistics for fare amount for rides with a fare more than 10000 and 1000,100 respectively. The first thing that we notice is that the number of rows can be small, with 9 for fare more than 10000 and 51 for fare more than 1000. Their relatively small numbers seems to indicate that they are a special group of possible outliers in the data. For rides with a fare of more than 100, we have 31162
+of such rides, however, this is less than 1% of the data in the database.
+
+For this report, I will consider a fare greater than 100 as high as it is about 2 standard deviations away from the mean value of 12.84.
+
+We observe that there is a minimum distance of 0.1 miles despite the high fare of at least 100. 
+
+## Fare More than 1000, Short Distance
+
+```{r}
+yellow_16_details%>%
+  select(fare_amount,trip_distance,total_amount,tolls_amount)%>%
+  filter(fare_amount>1000 & trip_distance==0.1)%>%
+  summarise(Mean_fare = mean(fare_amount),
+            Mean_toll = mean(tolls_amount),
+            Mean_total = mean(total_amount),
+    Number_of_Rows=n())
+```
+
+There were 4 rides where the fare amount was more than 1000 but the distance travelled was just 0.1 miles. This seems to be suspicious and warrants further investigation. 
+
+The following table will explore these 4 rides in detail.
+
+```{r}
+high_fare_short_dist1 <- yellow_16_details%>%
+  select(fare_amount,trip_distance,total_amount,tolls_amount,pickup_datetime,dropoff_datetime,pickup_latitude,pickup_longitude,dropoff_latitude,dropoff_longitude)%>%
+  filter(fare_amount>1000 & trip_distance==0.1)%>%collect()
+high_fare_short_dist1
+```
+
+The pattern shared by these 4 rides is that they all occur in the month of February. More specifically, 3 of the 4 rides occur at about 1500 hours on the same day of 12 February and charge the same fare amount at 2020.37.
+
+A map view of these 4 points is shown below
+
+```{r}
+register_google("AIzaSyAv8JFp9X1gNOLZUDLL78mWPqOoAnBX9e8")
+```
+
+```{r}
+ny_base_map <- get_map(location = c(lon = -74.00, lat = 40.71), maptype = "terrain", zoom = 11)
+ny_base_map_zoom <- ggmap(ny_base_map)+scale_x_continuous(limits = c(-74.1,-73.9))+
+  scale_y_continuous(limits = c(40.7,40.8))
+```
+
+```{r}
+pickup_point <- data.frame(longitude = c(-73.97561,-73.98698,
+                                           -73.97665,-73.97958),
+                            latitude = c(40.79219,40.77662,
+                                         40.76509,40.75124),
+                           number = c(1,2,3,4))
+dropoff_point <- data.frame(longitude = c(-73.97639,-73.98772,
+                                          -73.96152,-73.97923),
+                            latitude = c(40.79090,40.77567,
+                                        40.77953,40.75103),
+                            number = c(1,2,3,4))
+ny_base_map_zoom + geom_point(data=pickup_point, aes(x=longitude, y=latitude), color="red", size=5, alpha=0.2)+ geom_point(data = dropoff_point,aes(x=longitude, y= latitude), color ="blue", size =5, alpha=0.2)+ geom_text(data = dropoff_point,aes(x=longitude, y= latitude,label=number))+geom_text(data = pickup_point,aes(x=longitude, y= latitude,label=number))
+```
+
+The numbers indicate the 4 different rides, the pickup point is in red while the dropoff point is in blue. It is clear that there seems to be no observable pattern between the 4 rides as their pickup points and destination points are spaced far apart with no common destination. 
+
+We can also see that the third ride, which occurs at 1800 on 27 February travels very far compared to the others. While its distance is recorded at 0.1 miles (160.1 meters), the distance travelled could not have been that short. This record is most likely a mistake, and the distance travelled was definitely further than 0.1 miles.
+
+1500 hours on 12 February 2016 was a special time as we had 3 cases of rides going for just 0.1 miles but charged 2020.37 which is more than 100 times the mean fare amount at 12.84.
+
+## Fare More than 100, Short Distance
+
+We will now widen the scope of visualization and look at rides where the fare was more than 100 but the distance travelled was just 0.1 miles to see if we can identify a pattern in the data.
+
+```{r}
+high_fare_short_dist2 <- yellow_16_details%>%
+  select(fare_amount,trip_distance,total_amount,tolls_amount,pickup_longitude,pickup_latitude,pickup_datetime,dropoff_longitude,dropoff_latitude,dropoff_datetime)%>%
+  filter(fare_amount>100, trip_distance==0.1)%>%collect()
+```
+
+```{r}
+high_fare_short_dist2$number <- c(1:nrow(high_fare_short_dist2))
+```
+
+```{r}
+ny_base_map_zoom + geom_point(data=high_fare_short_dist2, aes(x=pickup_longitude, y=pickup_latitude), color="red", size=2, alpha=0.2)+ geom_point(data = high_fare_short_dist2,aes(x=dropoff_longitude, y= dropoff_latitude), color ="blue", size =2, alpha=0.2)
+```
+
+The red dots in the figure above represent pickup points while the blue dots represent dropoff points. The pickup and dropoff points seem to cluster near 3 points: Midtown Manhattan, south of state route 9A, and state route 78.
+
+In the figure below, we will take a closer look at the pickup and dropoff points. Now, pickup points and dropoff points are numbered. A blue colored number represents a dropoff point and a red colored number represents a pickup point.
+
+```{r}
+ny_base_map_zoom+
+  geom_text(data=high_fare_short_dist2, aes(x=pickup_longitude, y=pickup_latitude,label=number),color="red",alpha=0.7, size=3)+
+  geom_text(data = high_fare_short_dist2,aes(x=dropoff_longitude, y= dropoff_latitude,label=number),color="blue", alpha=0.7,size=3)
+```
+
+From the figure, we see that in most cases, the distance between pickup and dropff are close due to the low distance tavelled of 0.1 miles. However, there is a clear anomalous result, 208, whose pickup and dropoff points seem to suggest a distance greater than 0.1 miles as we can see from the figure below.
+
+```{r}
+ny_base_map_zoom+
+  geom_text(data=high_fare_short_dist2[208,], aes(x=pickup_longitude, y=pickup_latitude,label=number),color="red",alpha=0.7, size=3)+
+  geom_text(data = high_fare_short_dist2[208,],aes(x=dropoff_longitude, y= dropoff_latitude,label=number),color="blue", alpha=0.7,size=3)
+```
+
+Outside of this one anomalous result, there really does not seem to be a clear explanation as to why the fares are so high for a short distance trip based on the location of pickup and dropoffs. 
+
+Another possible reason for the high fare despite travelling only a short distance would be the time of the ride. In the section "Fare More than 1000, Short Distance", we saw that 3 of rides of the 4 rides we identified travelled at about 1500 hours on the same day, 12 February 2016. The fare could be inflated greatly due to slow traffic. 
+
+```{r}
+head(high_fare_short_dist2,10)
+```
+
+```{r}
+cat("Table of Months where Fare>100, Trip distance=0.1 \n")
+table(as.numeric(format(high_fare_short_dist2$pickup_datetime,"%m")))
+```
+
+We can see that the most of these rides occur in the first half of the year. However, if we check in the database, the data is only recorded till June, so we should expect data up till June. The sql query used to extract the finding is shown below:
+
+```{r echo=TRUE}
+"SELECT unique(MONTH(pickup_datetime)) as mon 
+FROM [local-concord-245816:project1.yellow_taxi_2016b]"
+```
+
+We take a look at date month combos to see if we can discover anything special.
+
+```{r}
+cat("Table of Dates where Fare>100, Trip distance=0.1 \n")
+table(format(high_fare_short_dist2$pickup_datetime,"%m/%d"))
+```
+
+```{r}
+cat("Table of Hours where Fare>100, Trip distance=0.1 \n")
+table(format(high_fare_short_dist2$pickup_datetime,"%H"))
+```
+
+From the table of dates, we can see that there seems to be no special date where the fares were just higher than usual. However, when we look at the hours where these occur, we can see that many of them occur from 0000 to 0400, 1100, 1500, 1700 and 2100 to 2300. The only timing that seems special is 1500, which we showed earlier contain 3 of the highest fares for a distance travelled of 0.1 miles.
+
+```{r}
+high_fare_short_dist2$hour <- as.numeric(format(high_fare_short_dist2$pickup_datetime,"%H"))
+```
+
+```{r}
+ny_base_map2 <- get_map(location = c(lon = -74.00, lat = 40.71), maptype = "terrain", zoom = 9)
+ny_base_map_zoom2 <- ggmap(ny_base_map)+scale_x_continuous(limits = c(-74.2,-73.79))+
+  scale_y_continuous(limits = c(40.6,40.86))
+```
+
+```{r}
+ny_base_map_zoom2 + geom_point(data=high_fare_short_dist2%>%filter(hour==15), aes(x=pickup_longitude, y=pickup_latitude), color="red", size=2, alpha=0.2)+ geom_point(data = high_fare_short_dist2%>%filter(hour==15),aes(x=dropoff_longitude, y= dropoff_latitude), color ="blue", size =2, alpha=0.2)
+```
+
+A quick look reveals no pattern for the rides that occured at 1500 hours. So my conclusion is that 1500 is probably a special hour in New York, where it is similar to a rush hour and as a result many taxis charged high fares.
+
+# Length of a Drive
+
+We saw in the section Trip Distance that the maximum distance travelled by a single ride is 19072629 miles. 
+
+```{r}
+longest_ride <- yellow_16_details%>%select(fare_amount,trip_distance,pickup_datetime,pickup_longitude,pickup_latitude,dropoff_datetime,dropoff_longitude,dropoff_latitude)%>%filter(trip_distance>19000000)%>%collect()
+```
+
+```{r}
+longest_ride
+```
+
+We can see that there is acutally an error in the record for this trip distance. The ride lasted about 18 minutes from pickup to dropoff and it is not possible to have travelled 19072629 miles in that time period. 
+
+With the possiblity of such errors being present, it might be better to estimate the length of a ride using the duration of the ride instead.
+The sql code used to generate the table being queried is as follows:
+
+```{r echo=TRUE}
+"SELECT fare_amount,trip_distance,dropoff_longitude,dropoff_latitude,pickup_longitude,pickup_latitude,TIMESTAMP_DIFF(dropoff_datetime,pickup_datetime, Minute) as time_diff 
+FROM `project1.yellow_taxi_2016b`" 
+```
+
+```{r}
+yellow_16_table2 <- tbl(bq_connection, "yellow_taxi_time_diff")
+```
+
+## Time taken for a Ride
+
+```{r}
+yellow_16_details2 <- yellow_16_table2%>%select(fare_amount, trip_distance,dropoff_longitude, dropoff_latitude,pickup_longitude,pickup_latitude,time_diff)
+```
+
+```{r}
+yellow_16_details2%>%select(time_diff)%>%
+  filter(time_diff>0 & time_diff<=96)%>%
+  summarise(Mean_time = mean(time_diff),
+            Sd_time = sd(time_diff),
+            Min_time =  min(time_diff),
+            Max_time = max(time_diff),
+            Number_of_Rows = n())
+```
+
+The summary statistics for the time needed for a ride to be completed (difference between dropoff and pickup time) are shown above. For the data, I have filtered out rides that go for more than 8 hours on the assumption that the taxi driver works about 8 hours a day. This filtering is done in an effort to further clean the dataset as we have noticed unrealistically long amounts of time being taken taken for a ride.
+
+Under these conditions, the mean duration of 1 ride is about 13.5 minutes, the shortest ride is 1 minute while the longest ride is 96 minutes which is about 8 hours. The standard deviation of the time taken for each ride is about 11 minutes. 
+
+The graph below shows the pickup points (red) and dropoff points (blue) for rides that took 96 minutes.   
+
+```{r}
+long_rides <- yellow_16_details2%>%filter(time_diff>0 & time_diff==96)%>%select(time_diff,dropoff_longitude,dropoff_latitude,pickup_longitude,pickup_latitude,fare_amount)%>%collect()
+long_rides$number <- c(1:nrow(long_rides))
+```
+
+```{r}
+ny_base_map_zoom2 + geom_point(data=long_rides, aes(x=pickup_longitude, y=pickup_latitude), color="red", size=2, alpha=0.2)+ geom_point(data = long_rides,aes(x=dropoff_longitude, y= dropoff_latitude), color ="blue", size =2, alpha=0.2)
+```
+
+From the figure above, we can see that most pickup and dropoff points occur in the city. There is a small cluster of points near the airport at (-73.8,40.66). However, most of these points seem to indicate a distance that requires less than 8 hours.
+
+Below, we will show the summary statistics for fare amount for trips. The mean of $52 for a fare seems to suggest that most of these trips go only as far as the airport from New York city (vice versa).
+
+```{r}
+summary(long_rides$fare_amount)
+```
+
+We can see that there is a maximum fare of 450 and upon checking, it is revealed that this driver went all the way from New York city to Harriman state park. However, he seems to be the exception to our observation that the the length of a ride does not seem to add up with the fare amount generated.
+
+A possible explanation for this unexpected observation is that the drivers were waiting or parked at a location for a very long time before picking up a passenger. It is possible that they had the timer on from waiting or parking all the way until a passenger is picked up, from which the ride went as long as the fare indicates.
+
+The next figure explores the short rides that occured (time taken=1).
+
+```{r}
+short_rides <- yellow_16_details2%>%filter(time_diff>0 & time_diff==1,fare_amount>0)%>%select(time_diff,dropoff_longitude,dropoff_latitude,pickup_longitude,pickup_latitude,fare_amount)%>%collect()
+short_rides$number <- c(1:nrow(short_rides))
+```
+
+```{r}
+ny_base_map_zoom2 + geom_point(data=head(short_rides,10000), aes(x=pickup_longitude, y=pickup_latitude), color="red", size=2, alpha=0.2)+ geom_point(data = head(short_rides,10000),aes(x=dropoff_longitude, y= dropoff_latitude), color ="blue", size =2, alpha=0.2)
+```
+
+Based on a 10000 row sample, we can see that most of these rides occured in the City, which is expected. The summary statistics of the fares for short rides is shown below.
+
+```{r}
+summary(short_rides$fare_amount)
+```
+
+Even with a short ride 1 minute, a driver can make 4 dollars on average. We also notice a very large fare amount of over 2000. We shall take a look at this ride in particular below:
+
+```{r}
+ny_base_map_zoom + geom_point(data=short_rides[451795,], aes(x=pickup_longitude, y=pickup_latitude), color="red", size=2, alpha=0.2)+ geom_point(data = short_rides[451795,],aes(x=dropoff_longitude, y= dropoff_latitude), color ="blue", size =2, alpha=0.2)
+```
+
+It is clear that fare amount has nothing to do with the distance travelled or time taken for the ride in this case. 
+
+Based on the cases we have observed so far for short rides (by time or distance) with high fares, a speculation I have for this occurence is that the taxi drivers only engaged the meter for 1 ride but reported their total earnings for a large number of rides. However, if this does not turn out to be true, and that the driver did indeed make a large amount of money off of 1 quick drive, I would still not bank on it as such occurences are few and far between: Only 5 out of the 872941 rides which took a minute got a fare amount of over 1000.
+
+# Conclusion
+
+This report highlights several interesting cases for rides that occured in New York City. In particular, short rides that made more than 100 in fares. A 1 minute ride hardly seems silly as it indicates a place within walking distance. The fact that there are rides that costed 100 dollars just to ferry a passenger a short distance away seems otherwordly.
+
+We also discovered a special hour in New York city, 1500 where 
+there seems to be a higher occurence of rides which costed over 100 dollars but went for just 0.1 miles.
+
+We also found out about a driver who went on an 8 hour journey to ferry a passenger from New York city to Harriman state park. The fact that this was a ride hail and not a pre-arranged drive is surprising. The passenger must have just decided to go on a journey, and the taxi driver must be really dedicated to his work since an 8 hour drive to the park meant and 8 hour drive back to the city.
+
+
+
+
