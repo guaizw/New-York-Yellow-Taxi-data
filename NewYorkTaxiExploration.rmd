@@ -210,7 +210,7 @@ The pattern shared by these 4 rides is that they all occur in the month of Febru
 A map view of these 4 points is shown below
 
 ```{r}
-register_google("AIzaSyAv8JFp9X1gNOLZUDLL78mWPqOoAnBX9e8")
+register_google("your google api key here")
 ```
 
 ```{r}
