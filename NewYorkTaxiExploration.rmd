@@ -126,7 +126,7 @@ yellow_16_details%>%
                               Sd_total = sd(total_amount),
                               Minimum_total =  min(total_amount),
                               Maximum_total = max(total_amount),
-                              Number_of_Rows = n())
+                              Number_of_Rows = n())%>%as.data.frame()
 ```
 
 ```{r}
@@ -149,7 +149,7 @@ yellow_16_details%>%
                               Sd_total = sd(total_amount),
                               Minimum_total =  min(total_amount),
                               Maximum_total = max(total_amount),
-                              Number_of_Rows = n())
+                              Number_of_Rows = n())%>%as.data.frame()
 ```
 
 ```{r}
@@ -172,7 +172,7 @@ yellow_16_details%>%
                               Sd_total = sd(total_amount),
                               Minimum_total =  min(total_amount),
                               Maximum_total = max(total_amount),
-                              Number_of_Rows = n())
+                              Number_of_Rows = n())%>%as.data.frame()
 ```
 
 Above, we show the summary statistics for fare amount for rides with a fare more than 10000 and 1000,100 respectively. The first thing that we notice is that the number of rows can be small, with 9 for fare more than 10000 and 51 for fare more than 1000. Their relatively small numbers seems to indicate that they are a special group of possible outliers in the data. For rides with a fare of more than 100, we have 31162
@@ -202,7 +202,7 @@ The following table will explore these 4 rides in detail.
 high_fare_short_dist1 <- yellow_16_details%>%
   select(fare_amount,trip_distance,total_amount,tolls_amount,pickup_datetime,dropoff_datetime,pickup_latitude,pickup_longitude,dropoff_latitude,dropoff_longitude)%>%
   filter(fare_amount>1000 & trip_distance==0.1)%>%collect()
-high_fare_short_dist1
+high_fare_short_dist1%>%print.data.frame()
 ```
 
 The pattern shared by these 4 rides is that they all occur in the month of February. More specifically, 3 of the 4 rides occur at about 1500 hours on the same day of 12 February and charge the same fare amount at 2020.37.
@@ -210,7 +210,7 @@ The pattern shared by these 4 rides is that they all occur in the month of Febru
 A map view of these 4 points is shown below
 
 ```{r}
-register_google("your google api key here")
+register_google("your google api code")
 ```
 
 ```{r}
